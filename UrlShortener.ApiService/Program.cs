@@ -6,6 +6,8 @@ using UrlShortener.ApiService.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddSqlServerDbContext<ApplicationDbContext>("sqldata");
+
 // Add service defaults & Aspire components.
 builder.AddServiceDefaults();
 
@@ -15,13 +17,13 @@ builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDbContext<ApplicationDbContext>(o =>
-    o.UseSqlServer(builder.Configuration.GetConnectionString("Database")));
+//builder.Services.AddDbContext<ApplicationDbContext>(o =>
+//    o.UseSqlServer(builder.Configuration.GetConnectionString("Database")));
 
 builder.Services.AddEndpoints(typeof(Program).Assembly);
 
 
-//builder.Services.AddMediatR(config => config.RegisterServicesFromAssembly(typeof(Program).Assembly));
+builder.Services.AddMediatR(config => config.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
 builder.Services.AddCarter();
 

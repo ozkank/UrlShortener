@@ -1,56 +1,79 @@
-﻿using Carter;
-using MediatR;
-using Microsoft.EntityFrameworkCore;
-using UrlShortener.ApiService.Infrastructure.Database;
+﻿//using Azure.Core;
+//using Carter;
+//using FluentValidation;
+//using MediatR;
+//using Microsoft.EntityFrameworkCore;
+//using UrlShortener.ApiService.Infrastructure.Database;
+//using UrlShortener.ApiService.Shared;
 
-namespace UrlShortener.ApiService.Features
-{
-    public class RedirectUrlQuery : IRequest<string>
-    {
-        public string Code { get; set; }
-    }
+//namespace UrlShortener.ApiService.Features
+//{
+//    public class RedirectUrl
+//    {
+//        public class Query : IRequest<Result<RedirectUrlResponse>>
+//        {
+//            public string Code { get; set; } = string.Empty;
+//        }
 
-    internal sealed class RedirectUrlQueryHandler :
-        IRequestHandler<RedirectUrlQuery, string>
-    {
-        private readonly ApplicationDbContext _context;
-        public const int NumberOfCharsInShortLink = 7;
-        private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+//        internal sealed class Handler : IRequestHandler<Query, Result<RedirectUrlResponse>>
+//        {
+//            private readonly ApplicationDbContext _context;
+//            public const int NumberOfCharsInShortLink = 7;
+//            private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-        private readonly Random _random = new();
+//            private readonly Random _random = new();
 
-        public RedirectUrlQueryHandler(ApplicationDbContext context)
-        {
-            _context = context;
-        }
+//            public Handler(ApplicationDbContext context)
+//            {
+//                _context = context;
+//            }
 
-        public async Task<string> Handle(RedirectUrlQuery request, CancellationToken cancellationToken)
-        {
-            var shortenedUrl = await _context
-                    .ShortenedUrls
-                    .FirstOrDefaultAsync(s => s.Code == request.Code);
+//            public async Task<Result<RedirectUrlResponse>> Handle(Query request, CancellationToken cancellationToken)
+//            {
+//                var item = await _context
+//                        .ShortenedUrls
+//                        .Where(s => s.Code == request.Code)
+//                        .Select(x => new RedirectUrlResponse
+//                        {
+//                            LongUrl = x.LongUrl,
+//                        })
+//                        .FirstOrDefaultAsync(cancellationToken);
 
-            if (shortenedUrl is null)
-            {
-                //return Results.NotFound();
-            }
+//                if (item is null)
+//                {
+//                    return Result.Failure<RedirectUrlResponse>(new Error(
+//                   "RedirectUrlResponse.Null",
+//                   "The longUrl with the specified shortUrl was not found"));
+//                }
 
-            return shortenedUrl.ShortUrl;
-        }
-    }
+//                return item;
+//            }
+//        }
 
+//    }
 
-    public class RedirectUrlEndpoint : ICarterModule
-    {
-        public void AddRoutes(IEndpointRouteBuilder app)
-        {
-            app.MapGet("api/{code}", async (String code, ISender sender) =>
-            {
-                var query = new RedirectUrlQuery { Code = code };
-                var result = await sender.Send(query);
+//    public class RedirectUrlEndpoint : ICarterModule
+//    {
+//        public void AddRoutes(IEndpointRouteBuilder app)
+//        {
+//            app.MapGet("api/redirect/{shortUrl}", async (string shortUrl, ISender sender) =>
+//            {
+//                var query = new RedirectUrl.Query { Code = shortUrl };
 
-                return Results.Ok(result);
-            });
-        }
-    }
-}
+//                var result = await sender.Send(query);
+
+//                if (result.IsFailure)
+//                {
+//                    return Results.NotFound(result.Error);
+//                }
+
+//                return Results.Ok(result.Value);
+//            });
+//        }
+//    }
+
+//    public class RedirectUrlResponse
+//    {
+//        public string LongUrl { get; set; } = string.Empty;
+//    }
+//}

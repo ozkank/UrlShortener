@@ -6,73 +6,86 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using UrlShortener.ApiService.Domain;
 using UrlShortener.ApiService.Infrastructure.Database;
+using UrlShortener.ApiService.Shared;
 
 namespace UrlShortener.ApiService.Features
 {
-    public class ShortenUrlQuery : IRequest<string>
+    public class ShortenUrl
     {
-        public string LongUrl { get; set; }
-    }
-
-
-    internal sealed class ShortenUrlQueryHandler :
-        IRequestHandler<ShortenUrlQuery, string>
-    {
-        private readonly ApplicationDbContext _context;
-        public const int NumberOfCharsInShortLink = 7;
-        private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-        private readonly Random _random = new();
-
-        public ShortenUrlQueryHandler(ApplicationDbContext context)
+        public class Command : IRequest<Result<string>>
         {
-            _context = context;
+            public string LongUrl { get; set; }
         }
 
-        public async Task<string> Handle(ShortenUrlQuery request, CancellationToken cancellationToken)
+        public class Validator : AbstractValidator<Command>
         {
-            if (!Uri.TryCreate(request.LongUrl, UriKind.Absolute, out _))
+            public Validator()
             {
-                throw new Exception("The specified URL is invalid.");
-                //return Results.BadRequest("The specified URL is invalid.");
+                RuleFor(c => c.LongUrl).NotEmpty();
+            }
+        }
+
+        internal sealed class Handler : IRequestHandler<Command, Result<string>>
+        {
+            private readonly ApplicationDbContext _dbContext;
+            private readonly IValidator<Command> _validator;
+            public const int NumberOfCharsInShortLink = 7;
+            private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            private readonly Random _random = new();
+
+            public Handler(ApplicationDbContext dbContext, IValidator<Command> validator)
+            {
+                _dbContext = dbContext;
+                _validator = validator;
             }
 
-            var code = await GenerateUniqueCode();
-
-            var shortenedUrl = new ShortenedUrl
+            public async Task<Result<string>> Handle(Command request,  CancellationToken cancellationToken)
             {
-                Id = Guid.NewGuid(),
-                LongUrl = request.LongUrl,
-                Code = code,
-                //ShortUrl = $"{_context.Request.Scheme}://{_context.Request.Host}/api/{code}",
-                CreatedOnUtc = DateTime.UtcNow
-            };
-
-            _context.ShortenedUrls.Add(shortenedUrl);
-
-            await _context.SaveChangesAsync();
-
-            return shortenedUrl.ShortUrl;
-        }
-
-        public async Task<string> GenerateUniqueCode()
-        {
-            var codeChars = new char[NumberOfCharsInShortLink];
-
-            while (true)
-            {
-                for (var i = 0; i < NumberOfCharsInShortLink; i++)
+                var validationResult = _validator.Validate(request);
+                if (!validationResult.IsValid)
                 {
-                    var randomIndex = _random.Next(Alphabet.Length - 1);
-
-                    codeChars[i] = Alphabet[randomIndex];
+                    return Result.Failure<string>(new Error(
+                        "ShortenUrl.Validation",
+                        validationResult.ToString()));
                 }
 
-                var code = new string(codeChars);
+                var code = await GenerateUniqueCode();
 
-                if (!await _context.ShortenedUrls.AnyAsync(s => s.Code == code))
+                var shortenedUrl = new ShortenedUrl
                 {
-                    return code;
+                    Id = Guid.NewGuid(),
+                    LongUrl = request.LongUrl,
+                    Code = code,
+                    //ShortUrl = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/api/{code}",
+                    CreatedOnUtc = DateTime.UtcNow
+                };
+
+                _dbContext.ShortenedUrls.Add(shortenedUrl);
+
+                await _dbContext.SaveChangesAsync();
+
+                return shortenedUrl.ShortUrl;
+            }
+
+            private async Task<string> GenerateUniqueCode()
+            {
+                var codeChars = new char[NumberOfCharsInShortLink];
+
+                while (true)
+                {
+                    for (var i = 0; i < NumberOfCharsInShortLink; i++)
+                    {
+                        var randomIndex = _random.Next(Alphabet.Length - 1);
+
+                        codeChars[i] = Alphabet[randomIndex];
+                    }
+
+                    var code = new string(codeChars);
+
+                    if (!await _dbContext.ShortenedUrls.AnyAsync(s => s.Code == code))
+                    {
+                        return code;
+                    }
                 }
             }
         }
@@ -82,13 +95,18 @@ namespace UrlShortener.ApiService.Features
     {
         public void AddRoutes(IEndpointRouteBuilder app)
         {
-            app.MapGet("api/shorten/{longUrl}", async (String longUrl, ISender sender) =>
+            app.MapPost("api/articles", async (ShortenUrl.Command request, ISender sender) =>
             {
-                var query = new ShortenUrlQuery { LongUrl = longUrl };
-                var result = await sender.Send(query);
+                var result = await sender.Send(request);
 
-                return Results.Ok(result);
+                if (result.IsFailure)
+                {
+                    return Results.BadRequest(result.Error);
+                }
+
+                return Results.Ok(result.Value);
             });
         }
     }
+
 }
