@@ -22,12 +22,18 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddEndpoints(typeof(Program).Assembly);
 
-
+//builder.Services.AddHostedService<ApiDbInitializer>();
 builder.Services.AddMediatR(config => config.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
 builder.Services.AddCarter();
 
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
+
+builder.Services.AddHttpContextAccessor();
+
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing.AddSource(ApiDbInitializer.ActivitySourceName));
 
 var app = builder.Build();
 

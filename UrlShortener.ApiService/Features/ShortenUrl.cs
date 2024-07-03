@@ -1,9 +1,7 @@
 ﻿using Carter;
 using FluentValidation;
 using MediatR;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using System;
 using UrlShortener.ApiService.Domain;
 using UrlShortener.ApiService.Infrastructure.Database;
 using UrlShortener.ApiService.Shared;
@@ -32,14 +30,16 @@ namespace UrlShortener.ApiService.Features
             public const int NumberOfCharsInShortLink = 7;
             private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
             private readonly Random _random = new();
+            private readonly IHttpContextAccessor _httpContextAccessor;
 
-            public Handler(ApplicationDbContext dbContext, IValidator<Command> validator)
+            public Handler(ApplicationDbContext dbContext, IValidator<Command> validator, IHttpContextAccessor httpContextAccessor)
             {
                 _dbContext = dbContext;
                 _validator = validator;
+                _httpContextAccessor = httpContextAccessor;
             }
 
-            public async Task<Result<string>> Handle(Command request,  CancellationToken cancellationToken)
+            public async Task<Result<string>> Handle(Command request, CancellationToken cancellationToken)
             {
                 var validationResult = _validator.Validate(request);
                 if (!validationResult.IsValid)
@@ -51,12 +51,15 @@ namespace UrlShortener.ApiService.Features
 
                 var code = await GenerateUniqueCode();
 
+                var httpContext = _httpContextAccessor.HttpContext;
+                var shortUrl = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/api/{code}";
+
                 var shortenedUrl = new ShortenedUrl
                 {
                     Id = Guid.NewGuid(),
                     LongUrl = request.LongUrl,
                     Code = code,
-                    //ShortUrl = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/api/{code}",
+                    ShortUrl = shortUrl,
                     CreatedOnUtc = DateTime.UtcNow
                 };
 
@@ -95,7 +98,7 @@ namespace UrlShortener.ApiService.Features
     {
         public void AddRoutes(IEndpointRouteBuilder app)
         {
-            app.MapPost("api/articles", async (ShortenUrl.Command request, ISender sender) =>
+            app.MapPost("api/shorten", async (ShortenUrl.Command request, ISender sender) =>
             {
                 var result = await sender.Send(request);
 
